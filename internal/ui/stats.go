@@ -15,6 +15,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
+	"golang.org/x/term"
 )
 
 var errCouldntGenerateStats = errors.New("couldn't generate stats")
@@ -22,6 +23,8 @@ var errCouldntGenerateStats = errors.New("couldn't generate stats")
 const (
 	statsLogEntriesLimit = 10000
 	statsTimeCharsBudget = 6
+	statsMaxSummaryBudget   = 40
+	statsAdditionalCellSize = statsTimeCharsBudget * 2
 )
 
 func RenderStats(db *sql.DB,
@@ -97,7 +100,26 @@ func getStats(db *sql.DB,
 		return "", err
 	}
 
+	// Get the terminal width
+	terminalWidth, _, err := term.GetSize(0)
+	if err != nil {
+		return "", err
+	}
+
+	size := 20
+
+	var summaryBudget int
+
+	if terminalWidth <= (size + statsAdditionalCellSize) {
+		summaryBudget = size
+	} else if ((terminalWidth) - statsAdditionalCellSize) >= statsMaxSummaryBudget {
+		summaryBudget = statsMaxSummaryBudget
+	} else {
+		summaryBudget = (terminalWidth) - statsAdditionalCellSize
+	}
+
 	var numEntriesInTable int
+
 	if len(entries) == 0 {
 		numEntriesInTable = 1
 	} else {
@@ -107,7 +129,7 @@ func getStats(db *sql.DB,
 	data := make([][]string, numEntriesInTable)
 	if len(entries) == 0 {
 		data[0] = []string{
-			utils.RightPadTrim("", 20, false),
+			utils.RightPadTrim("", summaryBudget, false),
 			"",
 			utils.RightPadTrim("", statsTimeCharsBudget, false),
 		}
@@ -123,7 +145,7 @@ func getStats(db *sql.DB,
 
 		if plain {
 			data[i] = []string{
-				utils.RightPadTrim(entry.TaskSummary, 20, false),
+				utils.RightPadTrim(entry.TaskSummary, summaryBudget, false),
 				fmt.Sprintf("%d", entry.NumEntries),
 				utils.RightPadTrim(timeSpentStr, statsTimeCharsBudget, false),
 			}
@@ -134,7 +156,7 @@ func getStats(db *sql.DB,
 				styleCache[entry.TaskSummary] = rowStyle
 			}
 			data[i] = []string{
-				rowStyle.Render(utils.RightPadTrim(entry.TaskSummary, 20, false)),
+				rowStyle.Render(utils.RightPadTrim(entry.TaskSummary, summaryBudget, false)),
 				rowStyle.Render(fmt.Sprintf("%d", entry.NumEntries)),
 				rowStyle.Render(utils.RightPadTrim(timeSpentStr, statsTimeCharsBudget, false)),
 			}
