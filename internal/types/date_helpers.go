@@ -65,6 +65,23 @@ func GetDateRangeFromPeriod(period string, now time.Time, fullWeek bool, maxDays
 
 	switch period {
 
+	case "lastw":
+		numDays = 5
+		offset := -6 - int(now.Weekday())
+		startOfWeek := now.AddDate(0, 0, offset)
+		start = time.Date(
+			startOfWeek.Year(),
+			startOfWeek.Month(),
+			startOfWeek.Day(),
+			0,
+			0,
+			0,
+			0,
+			startOfWeek.Location(),
+		)
+
+		end = start.AddDate(0, 0, numDays)
+
 	case "today":
 		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 0, 1)
