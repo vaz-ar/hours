@@ -16,13 +16,53 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
+	"golang.org/x/term"
 )
 
 var errCouldntGenerateReport = errors.New("couldn't generate report")
 
 const (
-	reportTimeCharsBudget = 6
+	reportTimeCharsBudget    = 6
+	reportMaxSummaryBudget   = 45
+	reportAdditionalCellSize = reportTimeCharsBudget * 2
 )
+
+func getSummaryBudget(numDays int) (int, error) {
+	var summaryBudget int
+	var err error
+
+	// Get the terminal width
+	terminalWidth, _, err := term.GetSize(0)
+	if err != nil {
+		return summaryBudget, err
+	}
+
+	computeBudget := func(size int) int {
+		// cell size
+		if terminalWidth <= (size+reportAdditionalCellSize)*numDays {
+			return size
+		}
+
+		if ((terminalWidth / numDays) - reportAdditionalCellSize) >= reportMaxSummaryBudget {
+			return reportMaxSummaryBudget
+		}
+
+		return (terminalWidth / numDays) - reportAdditionalCellSize
+	}
+
+	switch numDays {
+	case 7:
+		summaryBudget = computeBudget(8)
+	case 6:
+		summaryBudget = computeBudget(10)
+	case 5:
+		summaryBudget = computeBudget(14)
+	default:
+		summaryBudget = computeBudget(16)
+	}
+
+	return summaryBudget, err
+}
 
 func RenderReport(db *sql.DB,
 	style Style,
@@ -110,19 +150,13 @@ func getReport(db *sql.DB, style Style, start time.Time, numDays int, taskStatus
 
 	rs := style.getReportStyles(plain)
 
-	var summaryBudget int
-	switch numDays {
-	case 7:
-		summaryBudget = 8
-	case 6:
-		summaryBudget = 10
-	case 5:
-		summaryBudget = 14
-	default:
-		summaryBudget = 16
+	summaryBudget, err := getSummaryBudget(numDays)
+	if err != nil {
+		return "", err
 	}
 
 	styleCache := make(map[string]lipgloss.Style)
+
 	for rowIndex := range maxEntryForADay {
 		row := make([]string, numDays)
 		for colIndex := range numDays {
@@ -263,16 +297,9 @@ func getReportAgg(db *sql.DB,
 
 	rs := style.getReportStyles(plain)
 
-	var summaryBudget int
-	switch numDays {
-	case 7:
-		summaryBudget = 8
-	case 6:
-		summaryBudget = 10
-	case 5:
-		summaryBudget = 14
-	default:
-		summaryBudget = 16
+	summaryBudget, err := getSummaryBudget(numDays)
+	if err != nil {
+		return "", err
 	}
 
 	styleCache := make(map[string]lipgloss.Style)
